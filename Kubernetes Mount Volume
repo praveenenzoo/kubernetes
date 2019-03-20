@@ -1,0 +1,139 @@
+Kubernetes Persistent Volumes
+=============================================
+1.) create volume (LVM) &&
+this will be nginx's webroot
+# mkdir /tmp/data01
+# echo 'I love Kubernetes storage!' > /tmp/data01/index.html
+
+2.) Define physical volumes in a YAML file.
+
+# mkdir -p ~/examples/persistent-volumes/volumes/
+----Create the following content in the local-01.yaml file: under mountvolume-----
+# vi ~/examples/persistent-volumes/volumes/local-01.yaml
+------------------------
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: pv0001
+  labels:
+    type: local
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/tmp/data01
+------Create physical volumes by posting them to the API server------
+# kubectl create -f ~/examples/persistent-volumes/volumes/local-01.yaml
+
+output: persistentvolume "pv0001" created
+
+ 
+ # kubectl get pv
+NAME      CAPACITY   ACCESSMODES   STATUS      CLAIM     REASON    AGE
+pv0001    10Gi       RWO           Available                       14s
+
+3.) Requesting storage
+
+Create a YAML file defining the storage claim.
+ 
+# mkdir -p ~/examples/persistent-volumes/claims/
+#  vi ~/examples/persistent-volumes/claims/claim-01.yaml
+
+----Add the following content to the claim-01.yaml file:-----
+
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: myclaim-1
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 3Gi
+--------------------------Create the claim.-----------------------------------
+# kubectl create -f ~/examples/persistent-volumes/claims/claim-01.yaml
+ 
+Output: persistentvolumeclaim "myclaim-1" created
+
+------A background process will attempt to match this claim to a volume. The state of your claim will eventually look something like this:------
+
+# kubectl get pvc
+NAME        STATUS    VOLUME    CAPACITY   ACCESSMODES   AGE
+myclaim-1   Bound     pv0001    10Gi       RWO           7s
+ 
+# kubectl get pv
+NAME      CAPACITY   ACCESSMODES   STATUS    CLAIM               REASON    AGE
+pv0001    10Gi       RWO           Bound     default/myclaim-1
+ 
+------ Using your claim as a volume------
+----Start by creating a pod.yaml file.---
+# mkdir -p ~/examples/persistent-volumes/simpletest/
+# vi ~/examples/persistent-volumes/simpletest/pod.yaml
+
+----Add the following content to the pod.yaml file:----
+kind: Pod
+apiVersion: v1
+metadata:
+  name: mypod
+  labels:
+    name: frontendhttp
+spec:
+  containers:
+    - name: myfrontend
+      image: nginx
+      ports:
+        - containerPort: 80
+          name: "http-server"
+      volumeMounts:
+      - mountPath: "/usr/share/nginx/html"
+        name: mypd
+  volumes:
+    - name: mypd
+      persistentVolumeClaim:
+       claimName: myclaim-1
+
+------Use pod.yaml to create the pod and the claim, then check that it was all done  properly.-----
+
+# kubectl create -f ~/examples/persistent-volumes/simpletest/pod.yaml
+
+# kubectl describe pods mypod | less
+Name:           mypod
+Namespace:      default
+Node:           127.0.0.1/127.0.0.1
+Start Time:     Tue, 16 Aug 2016 09:42:03 -0400
+Labels:         name=frontendhttp
+Status:         Running
+IP:             172.17.0.2
+
+Output#
+# curl 172.17.0.2:80
+I love Kubernetes storage!
+
+-----------Example------------------
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nfs-web
+spec:
+  volumes:
+    # List of volumes to use, i.e. *what* to mount
+    - name: myvolume
+      < volume details, see below >
+    - name: mysecondvolume
+      < volume details, see below >
+
+  containers:
+    - name: mycontainer
+      volumeMounts:
+        # List of mount directories, i.e. *where* to mount
+        # We want to mount 'myvolume' into /usr/share/nginx/html
+        - name: myvolume
+          mountPath: /usr/share/nginx/html/
+        # We want to mount 'mysecondvolume' into /var/log
+        - name: mysecondvolume
+          mountPath: /var/log/
+-------------------------
