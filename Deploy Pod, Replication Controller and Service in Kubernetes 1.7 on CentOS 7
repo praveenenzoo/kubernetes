@@ -1,0 +1,140 @@
+Deploy web application on container using kubernetes
+=======================================
+                  1st Task 
+========================================
+Creating Service from Command Line using “kubectl expose”=====
+
+1.) Create Dockerfile 
+
+FROM httpd:2.4
+COPY ./public-html/ /usr/local/apache2/htdocs/  #check exact file location /var/www/html/ or /usr/local/apache2/htdocs/
+EXPOSE 80
+
+# docker build -t navtraweb:v1 .
+
+2.)-------------then create yml file and deploy on kubernetes-------
+------------------------------
+# mkdir /techcode
+# cd /techcode/
+
+# vi pod.yml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: web-server-pod
+  labels:
+   app: webserver-app1
+   region: IN
+   rack: r1
+   version: "1.1"
+spec:
+  containers:
+    - name: web-server-test-container
+      image: navtraweb:v1
+      ports:
+      - containerPort: 80
+3.)---------------------------------
+ 
+#kubectl create -f pod.yml
+# kubectl get pods
+# kubectl get pods -o wide   to check ip address and where is pod created (node1,node2)
+
+4.) Creating Service from Command Line using “kubectl expose”
+
+#  kubectl expose pods web-server-pod  --name=webpod-service --target-port=80  --type=NodePort
+
+# kubectl get svc
+# kubectl get svc -o wide
+# curl 192.168.1.50:30108
+
+==================================================
+                    2nd Task
+==================================================
+Creating service using yml file
+
+1.) Create a new yml file with the name ‘service.yml‘ with following content.
+
+# vi service.yml
+
+apiVersion: v1
+kind: Service
+metadata:
+ name: webpod-service
+ labels:
+   app: webpod-service-label
+spec:
+ type: NodePort
+ ports:
+ - port: 80
+   nodePort: 30001
+   protocol: TCP
+ selector:
+   version: "1.1"
+   
+2.) Now create the service by executing the following command
+
+# kubectl create -f service.yml
+# kubectl get svc
+# kubectl get svc -o wide
+# curl http://192.168.1.50:30001
+
+===========================================================
+         3rd Task Deploying Replication Controller
+===========================================================
+apiVersion: v1
+kind: ReplicationController
+metadata:
+ name: webserver-rc
+spec:
+ replicas: 5
+ selector:
+   app:  lamp-app1
+ template:
+    metadata:
+     labels:
+       app: lamp-app1
+       region: IN
+       rack: r1
+       version: "1.1"
+    spec:
+       containers:
+       - name: webserver-php-con1
+         image: navtraweb:v1
+         ports:
+         - containerPort: 80
+=============================================================
+Run the following command to deploy replication controller
+
+# kubectl create -f replication-controller.yml
+# kubectl get pods
+# kubectl get pods -o wide
+# kubectl get rc
+# kubectl get rc -o wide
+
+------------------------------------------------------------------
+Let’s define the service for above created replication controller.
+------------------------------------------------------------------
+# vi rc-service.yml
+
+apiVersion: v1
+kind: Service
+metadata:
+ name: webserver-service
+ labels:
+   app: webserver-service-label
+spec:
+ type: NodePort
+ ports:
+ - port: 80
+   nodePort: 30002
+   protocol: TCP
+ selector:
+   version: "1.1"
+   
+=========Create the service using kubectl command=========
+# kubectl create -f rc-service.yml
+# kubectl get svc -o wide
+
+***********************Now try accessing web server from both the nodes*********
+# curl http://192.168.1.40:30002
+
