@@ -1,0 +1,36 @@
+Docker Private Registry Server On Centos 7
+---------------------------------------------
+
+$ sudo yum -y update
+$ sudo yum -y install docker-distribution
+# firewall-cmd --add-port=5000/tcp --permanent
+# firewall-cmd --reload
+# systemctl start docker-distribution
+# systemctl enable docker-distribution
+systemctl status docker-distribution
+
+Step 4: Add Insecure Registry to Docker Engine
+
+vi  /etc/docker/daemon.json
+
+{
+ "insecure-registries" : ["myregistry.local:5000"]
+ }
+ 
+ systemctl restart docker
+ 
+-------------------client side---------------------------
+vi  /etc/docker/daemon.json
+
+{
+ "insecure-registries" : ["myregistry.local:5000"]
+ }
+ 
+cat /etc/hosts
+192.168.1.23 myregistry.local
+
+Pushing Docker images to the local registry
+
+docker pull ubuntu:16.04
+docker tag ubuntu:16.04 myregistry.local:5000/ubuntu:16.04
+docker push myregistry.local:5000/ubuntu:16.04
